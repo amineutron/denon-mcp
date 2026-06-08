@@ -1,0 +1,3 @@
+denon:
+  host: "192.168.0.XX"   # IP du Denon AVR
+  port: 23               # Port telnet (défaut: 23)
