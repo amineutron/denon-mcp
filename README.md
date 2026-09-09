@@ -1,6 +1,6 @@
 # Denon MCP Server
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![tests](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
 Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR Control (telnet).
 
@@ -10,6 +10,15 @@ Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR 
 - Autres modèles AVR-X series compatibles avec le protocole Denon AVR Control
 
 ## Configuration
+
+Ordre de résolution : variables d'environnement, puis fichier YAML (DENON_CONFIG, sinon `./config.yaml`, sinon `config.yaml` à côté du serveur, sinon celui de Lyra si le serveur est installé dans son arborescence). Le serveur fonctionne seul, sans Lyra.
+
+## Installation en une ligne
+
+```bash
+uvx denon-mcp          # après publication sur PyPI ; en attendant : uvx --from git+https://github.com/amineutron/denon-mcp denon-mcp
+```
+
 
 Ajouter dans `config.yaml` :
 
@@ -25,18 +34,20 @@ utile pour une réservation DHCP ou le Wake-on-LAN).
 
 ## Outils disponibles
 
-| Outil | Description | Arguments |
-|-------|-------------|-----------|
-| `volume_set` | Règle le volume (0-98, 80 = 0dB référence) | `level` (int) |
-| `volume_up` | Augmente le volume | `step` (int, default: 1) |
-| `volume_down` | Baisse le volume | `step` (int, default: 1) |
-| `mute_on` | Active le mute | - |
-| `mute_off` | Désactive le mute | - |
-| `mute_toggle` | Toggle le mute | - |
-| `power_on` | Allume le Denon | - |
-| `power_off` | Éteint le Denon (standby) | - |
-| `get_status` | Statut (volume, power) | - |
-| `set_input` | Change la source (BD, TV, GAME, etc.) | `source` (string) |
+<!-- tools:start -->
+| Outil | Rôle |
+|---|---|
+| `volume_set` | Regle le volume du Denon a un niveau specifique (0-98). 80 = 0dB reference. |
+| `volume_up` | Augmente le volume du Denon. |
+| `volume_down` | Baisse le volume du Denon. |
+| `mute_on` | Active le mute du Denon. |
+| `mute_off` | Desactive le mute du Denon. |
+| `mute_toggle` | Toggle le mute du Denon (on/off). |
+| `power_on` | Allume le Denon AVR. |
+| `power_off` | Eteint le Denon AVR (standby). |
+| `get_status` | Retourne le statut du Denon (volume, power, etc.). |
+| `set_input` | Change la source d'entree du Denon (BD, TV, GAME, SAT/CBL, DVD, MPLAY). |
+<!-- tools:end -->
 
 ## Sources d'entrée
 

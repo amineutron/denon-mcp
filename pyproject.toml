@@ -7,14 +7,26 @@ authors = [{ name = "amineutron", email = "amine.neutroncore@gmail.com" }]
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.5.0",
+    "mcp>=1.5,<2",
     "pyyaml>=6.0",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
 
 [project.urls]
 Homepage = "https://github.com/amineutron/denon-mcp"
 Repository = "https://github.com/amineutron/denon-mcp"
 Issues = "https://github.com/amineutron/denon-mcp/issues"
+
+[project.scripts]
+denon-mcp = "server:cli"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["server.py"]
+
+[tool.hatch.build.targets.sdist]
+include = ["server.py", "README.md", "LICENSE", "config.example.yaml", "tests/"]
 
 [build-system]
 requires = ["hatchling"]

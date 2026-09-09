@@ -37,24 +37,30 @@ except ImportError:
 
 def load_config() -> dict:
     """Charge la configuration Denon depuis config.yaml ou variables d'env."""
+    # Ordre de resolution : variables d'environnement, puis fichier YAML
+    # (DENON_CONFIG, sinon ./config.yaml, sinon le config.yaml de Lyra si le
+    # serveur est installe dans son arborescence).
     config = {
         "host": os.environ.get("DENON_HOST", ""),
         "port": int(os.environ.get("DENON_PORT", "23")),
     }
-
-    # Essayer de charger depuis config.yaml de Lyra
-    config_path = Path(__file__).parent.parent.parent / "config.yaml"
-    if config_path.exists():
+    candidates = [Path(p) for p in (os.environ.get("DENON_CONFIG", ""),) if p]
+    candidates += [Path.cwd() / "config.yaml", Path(__file__).parent / "config.yaml",
+                   Path(__file__).parent.parent.parent / "config.yaml"]
+    for config_path in candidates:
+        if not config_path.exists():
+            continue
         try:
             import yaml
             with open(config_path) as f:
-                cfg = yaml.safe_load(f)
-            denon_cfg = cfg.get("denon", {})
-            config["host"] = denon_cfg.get("host", config["host"])
-            config["port"] = denon_cfg.get("port", config["port"])
-        except Exception as e:
-            print(f"Warning: Could not load config.yaml: {e}", file=sys.stderr)
-
+                cfg = yaml.safe_load(f) or {}
+            denon_cfg = cfg.get("denon", {}) or {}
+            if not config["host"]:
+                config["host"] = denon_cfg.get("host", "") or ""
+                config["port"] = int(denon_cfg.get("port", config["port"]))
+        except Exception as e:  # fichier illisible : on continue avec l'env
+            print(f"Warning: Could not load {config_path}: {e}", file=sys.stderr)
+        break
     return config
 
 
@@ -270,13 +276,8 @@ class DenonAVRController:
 
 # Initialiser le serveur MCP
 app = Server("denon-mcp")
-config = load_config()
-
-if not config["host"]:
-    print("Error: DENON_HOST not configured", file=sys.stderr)
-    sys.exit(1)
-
-denon = DenonAVRController(config["host"], config["port"])
+config: dict = {}
+denon = None  # instancie dans main() : l'import du module ne doit rien exiger
 
 
 @app.list_tools()
@@ -414,11 +415,28 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
+def _connect() -> None:
+    """Charge la configuration et instancie le controleur (au demarrage, pas a l'import)."""
+    global config, denon
+    config = load_config()
+    if not config["host"]:
+        print("Error: DENON_HOST not configured (env DENON_HOST, or denon.host in config.yaml)", file=sys.stderr)
+        sys.exit(1)
+    denon = DenonAVRController(config["host"], config["port"])
+
+
 async def main():
     """Point d'entree principal."""
+    _connect()
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+def cli() -> None:
+    """Point d'entree console (pip/uvx) : lance le serveur MCP sur stdio."""
+    import asyncio as _asyncio
+    _asyncio.run(main())
