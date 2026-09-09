@@ -2,6 +2,8 @@
 
 [![tests](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
+**English summary.** MCP server for Denon AVR home-cinema receivers over the local telnet control protocol: power, volume, mute, inputs, status. Configure with `DENON_HOST` / `DENON_PORT` or a `config.yaml`; runs standalone (`uvx denon-mcp` after PyPI publication).
+
 Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR Control (telnet).
 
 ## Modèle supporté
@@ -106,3 +108,16 @@ python server.py
 ```
 
 Le serveur est automatiquement lancé par Lyra via la config MCP.
+
+## Part of the Lyra ecosystem
+
+| Dépôt | Rôle |
+|---|---|
+| [lyra](https://github.com/amineutron/lyra) | assistant DevOps vocal, local par défaut (AGPL-3.0) |
+| [fedora-agents](https://github.com/amineutron/fedora-agents) | MCP : machines virtuelles KVM et sauvegardes |
+| [mcp-tracking](https://github.com/amineutron/mcp-tracking) | MCP + API + tableau de bord des tâches longues |
+| [neutroncore](https://github.com/amineutron/neutroncore) | hub PWA du homelab |
+| [hue-mcp](https://github.com/amineutron/hue-mcp) | MCP Philips Hue (fork de ThomasRohde/hue-mcp) |
+| [pylips-mcp](https://github.com/amineutron/pylips-mcp) | MCP TV Philips |
+| [denon-mcp](https://github.com/amineutron/denon-mcp) | MCP ampli Denon |
+| [catt-mcp](https://github.com/amineutron/catt-mcp) | MCP Chromecast et DLNA |
