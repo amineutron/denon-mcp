@@ -3,7 +3,7 @@ name = "denon-mcp"
 version = "0.1.0"
 description = "MCP server for Denon AVR home cinema control via telnet"
 readme = "README.md"
-authors = [{ name = "marouabah" }]
+authors = [{ name = "amineutron", email = "amine.neutroncore@gmail.com" }]
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
@@ -12,7 +12,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/marouabah/denon-mcp"
+Homepage = "https://github.com/amineutron/denon-mcp"
+Repository = "https://github.com/amineutron/denon-mcp"
+Issues = "https://github.com/amineutron/denon-mcp/issues"
 
 [build-system]
 requires = ["hatchling"]
