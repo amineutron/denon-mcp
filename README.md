@@ -6,6 +6,12 @@
 
 Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR Control (telnet).
 
+## Démo
+
+![Client MCP : les 10 outils, puis get_status sur l'ampli réel](docs/assets/demo.gif)
+
+Enregistrée sur l'ampli réel avec [`docs/demo/record.sh`](docs/demo/record.sh) : un client MCP minimal ([`docs/demo/mcp_demo.py`](docs/demo/mcp_demo.py)) démarre le serveur en stdio avec `DENON_HOST` dans l'environnement, liste les outils et appelle `get_status` (lecture seule).
+
 ## Modèle supporté
 
 - **Denon AVR-X1700H DAB**
