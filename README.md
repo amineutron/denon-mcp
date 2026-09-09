@@ -1,5 +1,7 @@
 # Denon MCP Server
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
 Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR Control (telnet).
 
 ## Modèle supporté
