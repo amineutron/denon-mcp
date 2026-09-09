@@ -20,8 +20,8 @@ Configuration:
 import asyncio
 import json
 import os
-import sys
 import socket
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -29,7 +29,7 @@ from typing import Any
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
-    from mcp.types import Tool, TextContent
+    from mcp.types import TextContent, Tool
 except ImportError:
     print("Error: mcp package not installed. Run: pip install mcp", file=sys.stderr)
     sys.exit(1)
