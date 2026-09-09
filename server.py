@@ -24,7 +24,7 @@ import sys
 import socket
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     from mcp.server import Server
