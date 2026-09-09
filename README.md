@@ -13,11 +13,13 @@ Ajouter dans `config.yaml` :
 
 ```yaml
 denon:
-  host: "192.0.2.10"      # IP du Denon
+  host: "192.0.2.10"        # IP du Denon (exemple)
   port: 23                   # Port telnet (default: 23)
 ```
 
-Adresse MAC (ethernet) : `AA:BB:CC:DD:EE:FF`
+Les valeurs ci-dessous sont des exemples : remplacez-les par les valeurs de votre appareil
+(IP affichée dans le menu réseau de l'ampli, adresse MAC au format `AA:BB:CC:DD:EE:FF`
+utile pour une réservation DHCP ou le Wake-on-LAN).
 
 ## Outils disponibles
 
