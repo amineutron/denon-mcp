@@ -30,6 +30,7 @@ try:
     from mcp.server import Server, ServerRequestContext
     from mcp.server.stdio import stdio_server
     from mcp.types import (
+        ToolAnnotations,
         CallToolRequestParams,
         CallToolResult,
         ListToolsResult,
@@ -286,11 +287,21 @@ config: dict = {}
 denon = None  # instancie dans main() : l'import du module ne doit rien exiger
 
 
+# Profils d'annotations MCP (ToolAnnotations) : ils disent au client ce que fait
+# un outil avant de l'appeler. Aucun outil de ce serveur n'ecrase de donnee,
+# donc destructiveHint reste False ; la distinction utile est la lecture seule
+# et l'idempotence (rejouable sans effet cumulatif).
+_READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+_SET = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+_ACTION = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+
+
 def list_tools() -> list[Tool]:
     """Liste les outils disponibles."""
     return [
         Tool(
             name="volume_set",
+            annotations=_SET,
             description="Regle le volume du Denon a un niveau specifique (0-98). 80 = 0dB reference.",
             inputSchema={
                 "type": "object",
@@ -307,6 +318,7 @@ def list_tools() -> list[Tool]:
         ),
         Tool(
             name="volume_up",
+            annotations=_ACTION,
             description="Augmente le volume du Denon.",
             inputSchema={
                 "type": "object",
@@ -323,6 +335,7 @@ def list_tools() -> list[Tool]:
         ),
         Tool(
             name="volume_down",
+            annotations=_ACTION,
             description="Baisse le volume du Denon.",
             inputSchema={
                 "type": "object",
@@ -339,36 +352,43 @@ def list_tools() -> list[Tool]:
         ),
         Tool(
             name="mute_on",
+            annotations=_SET,
             description="Active le mute du Denon.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="mute_off",
+            annotations=_SET,
             description="Desactive le mute du Denon.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="mute_toggle",
+            annotations=_ACTION,
             description="Toggle le mute du Denon (on/off).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="power_on",
+            annotations=_SET,
             description="Allume le Denon AVR.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="power_off",
+            annotations=_SET,
             description="Eteint le Denon AVR (standby).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="get_status",
+            annotations=_READ,
             description="Retourne le statut du Denon (volume, power, etc.).",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
             name="set_input",
+            annotations=_SET,
             description="Change la source d'entree du Denon (BD, TV, GAME, SAT/CBL, DVD, MPLAY).",
             inputSchema={
                 "type": "object",
