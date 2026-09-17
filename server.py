@@ -214,13 +214,20 @@ class DenonAVRController:
         return f"Erreur: {response}"
 
     def mute_toggle(self) -> str:
-        """Toggle le mute."""
-        # Denon n'a pas de toggle natif, on doit lire l'etat d'abord
-        # Pour simplifier, on envoie juste MUON (comportement toggle sur certains modeles)
-        response = self._send_command("MUON")
-        if "ERROR" not in response:
-            return "Mute toggle"
-        return f"Erreur: {response}"
+        """Bascule le mute en interrogeant d'abord l'etat reel.
+
+        Le Denon n'a pas de commande toggle. L'ancien code envoyait MUON a
+        l'aveugle : demander "coupe le son" deux fois laissait le son coupe.
+        """
+        etat = self._send_command("MU?")
+        if "ERROR" in etat:
+            return f"Erreur: {etat}"
+
+        muet = any(ligne.strip() == "MUON" for ligne in etat.split('\r'))
+        response = self._send_command("MUOFF" if muet else "MUON")
+        if "ERROR" in response:
+            return f"Erreur: {response}"
+        return "Mute desactive" if muet else "Mute active"
 
     def power_on(self) -> str:
         """Allume le Denon."""
@@ -404,36 +411,47 @@ def list_tools() -> list[Tool]:
     ]
 
 
-async def call_tool(name: str, arguments: Any) -> list[TextContent]:
-    """Execute un outil."""
-    try:
-        if name == "volume_set":
-            level = arguments.get("level")
-            result = denon.volume_set(level)
-        elif name == "volume_up":
-            step = arguments.get("step", 1)
-            result = denon.volume_up(step)
-        elif name == "volume_down":
-            step = arguments.get("step", 1)
-            result = denon.volume_down(step)
-        elif name == "mute_on":
-            result = denon.mute_on()
-        elif name == "mute_off":
-            result = denon.mute_off()
-        elif name == "mute_toggle":
-            result = denon.mute_toggle()
-        elif name == "power_on":
-            result = denon.power_on()
-        elif name == "power_off":
-            result = denon.power_off()
-        elif name == "get_status":
-            result = json.dumps(denon.get_status(), indent=2)
-        elif name == "set_input":
-            source = arguments.get("source")
-            result = denon.set_input(source)
-        else:
-            result = f"Unknown tool: {name}"
+def _dispatch(name: str, arguments: Any) -> str:
+    """Aiguillage synchrone vers le controleur (sockets et temporisations)."""
+    if name == "volume_set":
+        level = arguments.get("level")
+        result = denon.volume_set(level)
+    elif name == "volume_up":
+        step = arguments.get("step", 1)
+        result = denon.volume_up(step)
+    elif name == "volume_down":
+        step = arguments.get("step", 1)
+        result = denon.volume_down(step)
+    elif name == "mute_on":
+        result = denon.mute_on()
+    elif name == "mute_off":
+        result = denon.mute_off()
+    elif name == "mute_toggle":
+        result = denon.mute_toggle()
+    elif name == "power_on":
+        result = denon.power_on()
+    elif name == "power_off":
+        result = denon.power_off()
+    elif name == "get_status":
+        result = json.dumps(denon.get_status(), indent=2)
+    elif name == "set_input":
+        source = arguments.get("source")
+        result = denon.set_input(source)
+    else:
+        result = f"Unknown tool: {name}"
 
+    return result
+
+
+async def call_tool(name: str, arguments: Any) -> list[TextContent]:
+    """Execute un outil.
+
+    Le controleur parle en telnet avec des temporisations : l'appeler
+    directement figerait la boucle asyncio du serveur (et donc tout autre
+    appel en cours). On le deporte dans un thread.
+    """
+    try:
+        result = await asyncio.to_thread(_dispatch, name, arguments)
         return [TextContent(type="text", text=result)]
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
