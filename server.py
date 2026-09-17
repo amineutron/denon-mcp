@@ -30,13 +30,13 @@ try:
     from mcp.server import Server, ServerRequestContext
     from mcp.server.stdio import stdio_server
     from mcp.types import (
-        ToolAnnotations,
         CallToolRequestParams,
         CallToolResult,
         ListToolsResult,
         PaginatedRequestParams,
         TextContent,
         Tool,
+        ToolAnnotations,
     )
 except ImportError:
     print("Error: mcp package not installed. Run: pip install mcp", file=sys.stderr)
