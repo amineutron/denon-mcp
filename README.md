@@ -27,6 +27,12 @@ Ordre de résolution : variables d'environnement, puis fichier YAML (DENON_CONFI
 uvx denon-mcp          # après publication sur PyPI ; en attendant : uvx --from git+https://github.com/amineutron/denon-mcp denon-mcp
 ```
 
+Configuration Claude Desktop / Claude Code (`mcpServers`) :
+
+```json
+{ "denon": { "command": "uvx", "args": ["denon-mcp"], "env": { "DENON_HOST": "192.0.2.22" } } }
+```
+
 
 Ajouter dans `config.yaml` :
 
