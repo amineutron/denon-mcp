@@ -1,0 +1,40 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.amineutron/denon-mcp",
+  "title": "Denon AVR",
+  "description": "Control a Denon AVR home cinema receiver over telnet: power, volume, mute, input source, status.",
+  "repository": {
+    "url": "https://github.com/amineutron/denon-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/amineutron/denon-mcp#readme",
+  "version": "0.2.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "denon-mcp",
+      "runtimeHint": "uvx",
+      "version": "0.2.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DENON_HOST",
+          "description": "IP address of the Denon receiver",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "DENON_PORT",
+          "description": "Telnet port of the receiver",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "23"
+        }
+      ]
+    }
+  ]
+}
