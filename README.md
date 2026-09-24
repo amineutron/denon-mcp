@@ -3,7 +3,7 @@
 
 [![tests](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/amineutron/denon-mcp/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
-**English summary.** MCP server for Denon AVR home-cinema receivers over the local telnet control protocol: power, volume, mute, inputs, status. Configure with `DENON_HOST` / `DENON_PORT` or a `config.yaml`; runs standalone (`uvx denon-mcp` after PyPI publication).
+**English summary.** MCP server for Denon AVR home-cinema receivers over the local telnet control protocol: power, volume, mute, inputs, status. Configure with `DENON_HOST` / `DENON_PORT` (optional `DENON_MAC` to follow the receiver when DHCP changes its IP) or a `config.yaml`; runs standalone (`uvx denon-mcp` after PyPI publication).
 
 Serveur MCP pour contrôler un Home Cinema Denon AVR via le protocole Denon AVR Control (telnet).
 
@@ -21,6 +21,8 @@ Enregistrée sur l'ampli réel avec [`docs/demo/record.sh`](docs/demo/record.sh)
 ## Configuration
 
 Ordre de résolution : variables d'environnement, puis fichier YAML (DENON_CONFIG, sinon `./config.yaml`, sinon `config.yaml` à côté du serveur, sinon celui de Lyra si le serveur est installé dans son arborescence). Le serveur fonctionne seul, sans Lyra.
+
+Sans réservation DHCP, renseignez aussi `mac` (ou `DENON_MAC`) : si l'IP ne répond plus, le serveur retrouve le Denon par son adresse MAC dans la table de voisinage du réseau local (une recherche toutes les 2 min au plus) et bascule sur la nouvelle IP.
 
 ## Installation en une ligne
 

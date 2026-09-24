@@ -15,12 +15,18 @@ Configuration:
     Les parametres Denon sont lus depuis config.yaml ou variables d'env:
     - DENON_HOST: IP du Denon
     - DENON_PORT: Port telnet (default: 23)
+    - DENON_MAC: adresse MAC (optionnel) : si l'IP ne repond plus (bail DHCP
+      change, pas de reservation possible), le serveur retrouve la nouvelle
+      IP par la table de voisinage du reseau local et bascule dessus.
 """
 
 import asyncio
+import ipaddress
 import json
 import os
+import re
 import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -51,6 +57,7 @@ def load_config() -> dict:
     config = {
         "host": os.environ.get("DENON_HOST", ""),
         "port": int(os.environ.get("DENON_PORT", "23")),
+        "mac": os.environ.get("DENON_MAC", ""),
     }
     candidates = [Path(p) for p in (os.environ.get("DENON_CONFIG", ""),) if p]
     candidates += [Path.cwd() / "config.yaml", Path(__file__).parent / "config.yaml",
@@ -66,18 +73,95 @@ def load_config() -> dict:
             if not config["host"]:
                 config["host"] = denon_cfg.get("host", "") or ""
                 config["port"] = int(denon_cfg.get("port", config["port"]))
+            if not config["mac"]:
+                config["mac"] = str(denon_cfg.get("mac", "") or "")
         except Exception as e:  # fichier illisible : on continue avec l'env
             print(f"Warning: Could not load {config_path}: {e}", file=sys.stderr)
         break
     return config
 
 
+# --------------------------------------------------------------------------- #
+# Redecouverte par adresse MAC
+# --------------------------------------------------------------------------- #
+DISCOVERY_COOLDOWN_S = 120
+_last_discovery = 0.0
+
+
+def normalize_mac(mac: str) -> str:
+    """'00:06:78:12:34:56', '000678123456', '00-06-...' -> '000678123456' ('' si invalide)."""
+    hexa = re.sub(r"[^0-9a-fA-F]", "", mac or "").lower()
+    return hexa if len(hexa) == 12 else ""
+
+
+def ip_for_mac(neigh_text: str, mac: str) -> str | None:
+    """IPv4 associee a `mac` dans la sortie de `ip neigh` (None si absente)."""
+    target = normalize_mac(mac)
+    if not target:
+        return None
+    for line in neigh_text.splitlines():
+        parts = line.split()
+        if "lladdr" not in parts or not parts:
+            continue
+        lladdr = parts[parts.index("lladdr") + 1] if parts.index("lladdr") + 1 < len(parts) else ""
+        try:
+            is_v4 = ipaddress.ip_address(parts[0]).version == 4
+        except ValueError:
+            continue
+        if is_v4 and normalize_mac(lladdr) == target:
+            return parts[0]
+    return None
+
+
+def subnet_hosts(hint_ip: str) -> list[str]:
+    """Hotes du /24 de l'ancienne IP (le Denon reste sur le meme reseau local)."""
+    net = ipaddress.ip_network(f"{hint_ip}/24", strict=False)
+    return [str(h) for h in net.hosts()]
+
+
+def _read_neigh() -> str:
+    try:
+        return subprocess.run(["ip", "neigh"], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _warm_arp(hosts: list[str]) -> None:
+    """Un datagramme UDP par hote force le noyau a resoudre sa MAC (pas de
+    sous-processus, pas de droits particuliers) ; on laisse 1,5 s aux reponses."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        for host in hosts:
+            try:
+                sock.sendto(b"", (host, 9))  # port discard
+            except OSError:
+                continue
+    time.sleep(1.5)
+
+
+def rediscover_host(mac: str, hint_ip: str) -> str | None:
+    """Nouvelle IP du Denon d'apres sa MAC, au plus une recherche par cooldown."""
+    global _last_discovery
+    now = time.monotonic()
+    if now - _last_discovery < DISCOVERY_COOLDOWN_S:
+        return None
+    _last_discovery = now
+    found = ip_for_mac(_read_neigh(), mac)
+    if found is None:
+        try:
+            _warm_arp(subnet_hosts(hint_ip))
+        except ValueError:
+            return None
+        found = ip_for_mac(_read_neigh(), mac)
+    return found
+
+
 class DenonAVRController:
     """Controleur pour Home Cinema Denon via telnet."""
 
-    def __init__(self, host: str, port: int = 23):
+    def __init__(self, host: str, port: int = 23, mac: str = ""):
         self.host = host
         self.port = port
+        self.mac = mac
         self.timeout = 3
 
     def _send_command(self, command: str) -> str:
@@ -89,25 +173,34 @@ class DenonAVRController:
         Returns:
             Reponse brute du Denon
         """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-
         try:
-            sock.connect((self.host, self.port))
+            return self._send_once(self.host, command)
+        except OSError as first:
+            # IP changee par le DHCP ? on retrouve le Denon par sa MAC et on reessaie une fois
+            new_host = rediscover_host(self.mac, self.host) if self.mac else None
+            if new_host and new_host != self.host:
+                print(f"Denon: {self.host} injoignable, nouvelle IP {new_host} (MAC {self.mac})", file=sys.stderr)
+                self.host = new_host
+                try:
+                    return self._send_once(self.host, command)
+                except OSError as second:
+                    return self._error(second)
+            return self._error(first)
+        except Exception as e:  # reponse illisible, commande non ASCII... : jamais d'exception vers MCP
+            return f"ERROR: {e}"
 
-            # Envoyer commande
+    @staticmethod
+    def _error(exc: OSError) -> str:
+        if isinstance(exc, socket.timeout):
+            return "ERROR: Timeout - Denon may be off"
+        return f"ERROR: {exc}"
+
+    def _send_once(self, host: str, command: str) -> str:
+        """Une connexion telnet, une commande, la reponse brute (leve OSError)."""
+        with socket.create_connection((host, self.port), timeout=self.timeout) as sock:
             sock.send(f"{command}\r".encode('ascii'))
             time.sleep(0.3)
-
-            # Lire reponse
-            response = sock.recv(1024).decode('ascii', errors='ignore')
-            sock.close()
-
-            return response.strip()
-        except socket.timeout:
-            return "ERROR: Timeout - Denon may be off"
-        except Exception as e:
-            return f"ERROR: {str(e)}"
+            return sock.recv(1024).decode('ascii', errors='ignore').strip()
 
     def get_volume(self) -> dict:
         """Retourne le volume actuel."""
@@ -487,7 +580,7 @@ def _connect() -> None:
     if not config["host"]:
         print("Error: DENON_HOST not configured (env DENON_HOST, or denon.host in config.yaml)", file=sys.stderr)
         sys.exit(1)
-    denon = DenonAVRController(config["host"], config["port"])
+    denon = DenonAVRController(config["host"], config["port"], config.get("mac", ""))
 
 
 async def main():

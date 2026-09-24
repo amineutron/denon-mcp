@@ -1,3 +1,5 @@
 denon:
   host: "192.0.2.10"     # IP du Denon AVR (exemple, remplacez par la vôtre)
   port: 23               # Port telnet (défaut: 23)
+  mac: ""                # Optionnel : MAC du Denon (ex. "00:06:78:xx:xx:xx"). Si l'IP
+                         # change (DHCP sans reservation), le serveur la retrouve par la MAC.
