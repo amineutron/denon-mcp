@@ -245,12 +245,24 @@ class DenonAVRController:
 
     def get_status(self) -> dict:
         """Retourne le statut complet du Denon."""
-        vol = self.get_volume()
         power = self._send_command("PW?")
+        if "ERROR" in power:
+            # Injoignable (eteint au secteur, reseau) : distinct de la veille,
+            # qui repond PWSTANDBY.
+            return {"volume": None, "power": "unknown", "muted": False,
+                    "source": None, "reachable": False, "error": power}
+        vol = self.get_volume()
+        mute = self._send_command("MU?")
+        source = self._send_command("SI?")
 
+        lignes_mute = [l.strip() for l in mute.split('\r')]
+        lignes_src = [l.strip() for l in source.split('\r') if l.strip().startswith("SI")]
         status = {
             "volume": vol.get("current", -1),
             "power": "on" if "PWON" in power else "standby",
+            "muted": "MUON" in lignes_mute,
+            "source": lignes_src[0][2:] if lignes_src else None,
+            "reachable": True,
         }
 
         return status
@@ -390,7 +402,7 @@ def list_tools() -> list[Tool]:
         Tool(
             name="get_status",
             annotations=_READ,
-            description="Retourne le statut du Denon (volume, power, etc.).",
+            description="Retourne le statut du Denon : volume, power (on/standby/unknown), muted, source (BD, TV, GAME...), reachable.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
