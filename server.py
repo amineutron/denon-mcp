@@ -255,8 +255,8 @@ class DenonAVRController:
         mute = self._send_command("MU?")
         source = self._send_command("SI?")
 
-        lignes_mute = [l.strip() for l in mute.split('\r')]
-        lignes_src = [l.strip() for l in source.split('\r') if l.strip().startswith("SI")]
+        lignes_mute = [ligne.strip() for ligne in mute.split('\r')]
+        lignes_src = [ligne.strip() for ligne in source.split('\r') if ligne.strip().startswith("SI")]
         status = {
             "volume": vol.get("current", -1),
             "power": "on" if "PWON" in power else "standby",
