@@ -2,6 +2,16 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
+## [0.2.2] - 2026-09-24
+
+### Ajouté
+
+- Follow the receiver by MAC address when DHCP changes its IP (`mac` in config.yaml or `DENON_MAC`)
+
+### Corrigé
+
+- `denon-mcp --help` and `--version` answer without any configuration (they used to start the server or fail on `DENON_HOST`)
+
 ## [0.2.1] - 2026-09-24
 
 ### Ajouté
