@@ -594,7 +594,22 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-def cli() -> None:
-    """Point d'entree console (pip/uvx) : lance le serveur MCP sur stdio."""
-    import asyncio as _asyncio
-    _asyncio.run(main())
+def cli(argv: list[str] | None = None) -> None:
+    """Point d'entree console (pip/uvx) : lance le serveur MCP sur stdio.
+    --help et --version repondent sans configuration ni ampli."""
+    import argparse
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        ver = version("denon-mcp")
+    except PackageNotFoundError:
+        ver = "dev"
+    parser = argparse.ArgumentParser(
+        prog="denon-mcp",
+        description="MCP server for Denon AVR receivers (telnet control protocol, stdio transport).",
+        epilog="Configuration: DENON_HOST (required), DENON_PORT (default 23), DENON_MAC (optional, follow the "
+               "receiver when DHCP changes its IP), DENON_CONFIG (path to a config.yaml with a `denon:` section).",
+    )
+    parser.add_argument("--version", action="version", version=f"denon-mcp {ver}")
+    parser.parse_args(argv)
+    asyncio.run(main())
