@@ -1,6 +1,6 @@
 [project]
 name = "denon-mcp"
-version = "0.2.2"
+version = "0.3.0"
 description = "MCP server for Denon AVR home cinema control via telnet"
 readme = "README.md"
 authors = [{ name = "amineutron", email = "amine.neutroncore@gmail.com" }]
@@ -20,13 +20,13 @@ Repository = "https://github.com/amineutron/denon-mcp"
 Issues = "https://github.com/amineutron/denon-mcp/issues"
 
 [project.scripts]
-denon-mcp = "server:cli"
+denon-mcp = "denon_mcp.server:cli"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["server.py"]
+packages = ["denon_mcp"]
 
 [tool.hatch.build.targets.sdist]
-include = ["server.py", "README.md", "LICENSE", "config.example.yaml", "tests/"]
+include = ["denon_mcp/", "server.py", "README.md", "LICENSE", "config.example.yaml", "tests/"]
 
 [build-system]
 requires = ["hatchling"]

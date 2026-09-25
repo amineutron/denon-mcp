@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import server  # noqa: E402
+from denon_mcp import server  # noqa: E402
 
 
 def test_readme_tools_match_server():

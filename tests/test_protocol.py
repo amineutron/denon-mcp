@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import server  # noqa: E402
+from denon_mcp import server  # noqa: E402
 
 
 class FakeDenon:
@@ -166,3 +166,11 @@ def test_cli_version(capsys):
         server.cli(["--version"])
     assert exc.value.code == 0
     assert "denon-mcp" in capsys.readouterr().out
+
+
+def test_python_m_denon_mcp_version():
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    out = subprocess.run([sys.executable, "-m", "denon_mcp", "--version"], cwd=root,
+                         capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0 and out.stdout.startswith("denon-mcp ")

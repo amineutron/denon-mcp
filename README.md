@@ -118,10 +118,12 @@ echo "PWON" | nc 192.0.2.10 23
 ## Installation
 
 ```bash
-cd mcp-servers/denon-mcp
-python server.py
+denon-mcp                     # installé (pip, uvx) ; `denon-mcp --help` liste les réglages
+python -m denon_mcp           # équivalent, depuis tout environnement où le paquet est installé
+python server.py              # depuis un clone, sans installation (lanceur minimal, code dans denon_mcp/)
 ```
 
+Le code vit dans le paquet `denon_mcp` : il s'installe à côté d'autres serveurs MCP sans conflit de nom de module.
 Le serveur est automatiquement lancé par Lyra via la config MCP.
 
 ## Part of the Lyra ecosystem

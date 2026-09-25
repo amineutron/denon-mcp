@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import server  # noqa: E402
+from denon_mcp import server  # noqa: E402
 
 NEIGH = """192.0.2.22 dev eth0 lladdr 00:11:22:33:44:55 REACHABLE
 192.0.2.26 dev eth0 lladdr 00:06:78:12:34:56 STALE

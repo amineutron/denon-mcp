@@ -15,7 +15,7 @@ os.environ.setdefault("MCP_TOOLS_TABLE", "1")  # les serveurs ne doivent rien ch
 
 
 def rows():
-    import server  # noqa: E402
+    from denon_mcp import server  # noqa: E402
     tools = asyncio.run(server.list_tools())
     return [(t.name, (t.description or "").strip().split("\n")[0]) for t in tools]
 
