@@ -5,6 +5,7 @@ Usage : uv run python scripts/gen_tools_table.py [--check]
 Le tableau est place entre les marqueurs <!-- tools:start --> et <!-- tools:end -->.
 """
 import asyncio
+import inspect
 import os
 import sys
 from pathlib import Path
@@ -16,7 +17,9 @@ os.environ.setdefault("MCP_TOOLS_TABLE", "1")  # les serveurs ne doivent rien ch
 
 def rows():
     from denon_mcp import server  # noqa: E402
-    tools = asyncio.run(server.list_tools())
+    tools = server.list_tools()
+    if inspect.isawaitable(tools):  # list_tools() est synchrone depuis mcp 2.x
+        tools = asyncio.run(tools)
     return [(t.name, (t.description or "").strip().split("\n")[0]) for t in tools]
 
 

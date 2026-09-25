@@ -62,7 +62,7 @@ utile pour une réservation DHCP ou le Wake-on-LAN).
 | `mute_toggle` | Toggle le mute du Denon (on/off). |
 | `power_on` | Allume le Denon AVR. |
 | `power_off` | Eteint le Denon AVR (standby). |
-| `get_status` | Retourne le statut du Denon (volume, power, etc.). |
+| `get_status` | Retourne le statut du Denon : volume, power (on/standby/unknown), muted, source (BD, TV, GAME...), reachable. |
 | `set_input` | Change la source d'entree du Denon (BD, TV, GAME, SAT/CBL, DVD, MPLAY). |
 <!-- tools:end -->
 
