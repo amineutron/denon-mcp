@@ -2,6 +2,12 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
+## [0.3.1] - 2026-09-25
+
+### Corrigé
+
+- The server now starts without `DENON_HOST` (warning on stderr) instead of exiting: clients and directories (Glama) can list the tools without any configuration, and each tool call answers `ERROR: DENON_HOST not configured ...` until the receiver is set.
+
 ## [0.3.0] - 2026-09-25
 
 ### Modifié

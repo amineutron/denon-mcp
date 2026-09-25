@@ -174,3 +174,48 @@ def test_python_m_denon_mcp_version():
     out = subprocess.run([sys.executable, "-m", "denon_mcp", "--version"], cwd=root,
                          capture_output=True, text=True, timeout=30)
     assert out.returncode == 0 and out.stdout.startswith("denon-mcp ")
+
+
+# ------------------------------------------------------------ demarrage sans configuration
+# Regression : sans DENON_HOST le serveur quittait au demarrage (sys.exit), donc un
+# annuaire (Glama) qui le lance sans config pour lister ses outils voyait un echec.
+_INTROSPECTION = "\n".join([
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18",'
+    '"capabilities":{},"clientInfo":{"name":"t","version":"0"}}}',
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
+    '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_status","arguments":{}}}',
+]) + "\n"
+
+
+def test_demarre_et_liste_les_outils_sans_configuration(tmp_path):
+    import json
+    import os
+    import subprocess
+    root = Path(__file__).resolve().parent.parent
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path)}  # ni DENON_HOST ni config.yaml
+    # stdin reste ouvert jusqu'a la reponse 3 : un client MCP ne ferme pas avant la fin
+    proc = subprocess.Popen([sys.executable, "-m", "denon_mcp"], cwd=tmp_path, text=True,
+                            env={**env, "PYTHONPATH": str(root)},
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    replies = {}
+    try:
+        proc.stdin.write(_INTROSPECTION)
+        proc.stdin.flush()
+        for line in proc.stdout:
+            d = json.loads(line)
+            if "id" in d:
+                replies[d["id"]] = d
+            if 3 in replies:
+                break
+    finally:
+        proc.kill()
+        proc.wait(timeout=10)
+    assert len(replies[2]["result"]["tools"]) == len(server.list_tools())
+    call = replies[3]["result"]
+    assert "DENON_HOST" in call["content"][0]["text"]
+
+
+def test_outil_sans_hote_repond_une_erreur_claire(make):
+    ctl = server.DenonAVRController("", 23)
+    assert "DENON_HOST" in ctl.get_volume()["error"]

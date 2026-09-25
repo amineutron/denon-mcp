@@ -160,6 +160,9 @@ def rediscover_host(mac: str, hint_ip: str) -> str | None:
     return found
 
 
+_NO_HOST = "DENON_HOST not configured (env DENON_HOST, or denon.host in config.yaml)"
+
+
 class DenonAVRController:
     """Controleur pour Home Cinema Denon via telnet."""
 
@@ -178,6 +181,8 @@ class DenonAVRController:
         Returns:
             Reponse brute du Denon
         """
+        if not self.host:
+            return f"ERROR: {_NO_HOST}"
         try:
             return self._send_once(self.host, command)
         except OSError as first:
@@ -583,8 +588,9 @@ def _connect() -> None:
     global config, denon
     config = load_config()
     if not config["host"]:
-        print("Error: DENON_HOST not configured (env DENON_HOST, or denon.host in config.yaml)", file=sys.stderr)
-        sys.exit(1)
+        # On demarre quand meme : un client (ou un annuaire comme Glama) doit pouvoir
+        # lister les outils sans configuration ; chaque appel dira ce qui manque.
+        print(f"Warning: {_NO_HOST}", file=sys.stderr)
     denon = DenonAVRController(config["host"], config["port"], config.get("mac", ""))
 
 

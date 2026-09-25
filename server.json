@@ -8,13 +8,13 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/amineutron/denon-mcp#readme",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "denon-mcp",
       "runtimeHint": "uvx",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "transport": {
         "type": "stdio"
       },
