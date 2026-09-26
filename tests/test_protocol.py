@@ -18,12 +18,17 @@ class FakeDenon:
         self.replies = replies
         self.sent: list[str] = []
 
-    def __call__(self, host: str, command: str) -> str:
-        self.sent.append(command)
-        reply = self.replies.get(command, "")
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
+    def __call__(self, host: str, commands: list[str]) -> str:
+        # une connexion par appel : toutes les commandes passent dans la meme session
+        self.sessions = getattr(self, "sessions", 0) + 1
+        out = []
+        for command in commands:
+            self.sent.append(command)
+            reply = self.replies.get(command, "")
+            if isinstance(reply, Exception):
+                raise reply
+            out.append(reply)
+        return "\r".join(r for r in out if r)
 
 
 @pytest.fixture
@@ -219,3 +224,90 @@ def test_demarre_et_liste_les_outils_sans_configuration(tmp_path):
 def test_outil_sans_hote_repond_une_erreur_claire(make):
     ctl = server.DenonAVRController("", 23)
     assert "DENON_HOST" in ctl.get_volume()["error"]
+
+
+# ------------------------------------------------------------ une seule connexion
+def test_statut_en_une_seule_session(make):
+    # Regression : 4 connexions telnet avec 0,3 s d'attente chacune (1,2 s par statut)
+    ctl, fake = make({"PW?": "PWON", "MV?": "MV305", "MU?": "MUOFF", "SI?": "SITV"})
+    ctl.get_status()
+    assert fake.sessions == 1 and fake.sent == ["PW?", "MV?", "MU?", "SI?"]
+
+
+def test_volume_up_en_une_seule_session(make):
+    ctl, fake = make({"MVUP": "MV46", "MV?": "MV46"})
+    assert ctl.volume_up(step=2) == "Volume: 46"
+    assert fake.sessions == 1
+
+
+def test_volume_set_verifie_dans_la_meme_session(make):
+    ctl, fake = make({"MV44": "MV44", "MV?": "MV44"})
+    assert ctl.volume_set(44) == "Volume regle a 44"
+    assert fake.sessions == 1 and fake.sent == ["MV44", "MV?"]
+
+
+@pytest.mark.parametrize("command,prefix", [("PW?", "PW"), ("MVUP", "MV"), ("MV445", "MV"), ("SISAT/CBL", "SI"), ("MUON", "MU")])
+def test_prefixe_de_reponse_attendu(command, prefix):
+    assert server.reply_prefix(command) == prefix
+
+
+def test_ligne_mvmax_nest_pas_une_reponse_de_volume():
+    assert server.is_reply("MV32", "MV") and not server.is_reply("MVMAX 83", "MV")
+
+
+class _FakeAmp:
+    """Faux ampli TCP qui reproduit le comportement mesure sur un AVR-X1700H :
+    reponse ~20-60 ms apres la commande, et la ligne MVMAX qui arrive en retard,
+    pendant la reponse a la commande suivante."""
+
+    def __init__(self):
+        import socket
+        import threading
+        self.srv = socket.socket()
+        self.srv.bind(("127.0.0.1", 0))
+        self.srv.listen(1)
+        self.port = self.srv.getsockname()[1]
+        self.connections = 0
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        import time
+        # "MV32" (volume deja a 32) : le vrai ampli n'envoie aucun echo
+        replies = {"PW?": ["PWON"], "MV?": ["MV32"], "MU?": ["MVMAX 83", "MUOFF"], "SI?": ["SITV"], "MV32": []}
+        while True:
+            conn, _ = self.srv.accept()
+            self.connections += 1
+            with conn:
+                buf = b""
+                while True:
+                    data = conn.recv(64)
+                    if not data:
+                        break
+                    buf += data
+                    while b"\r" in buf:
+                        cmd, buf = buf.split(b"\r", 1)
+                        time.sleep(0.03)
+                        for line in replies.get(cmd.decode(), []):
+                            conn.sendall(line.encode() + b"\r")
+
+
+def test_session_reelle_sur_un_faux_ampli_tcp():
+    import time
+    amp = _FakeAmp()
+    ctl = server.DenonAVRController("127.0.0.1", amp.port)
+    t0 = time.perf_counter()
+    status = ctl.get_status()
+    elapsed = time.perf_counter() - t0
+    assert status == {"volume": 32, "power": "on", "muted": False, "source": "TV", "reachable": True}
+    assert amp.connections == 1
+    assert elapsed < 0.6  # 4 reponses a ~30 ms, et non plus 4 x (connexion + 0,3 s)
+
+
+def test_ordre_sans_echo_ne_bloque_pas():
+    # Regression : volume_set a la valeur actuelle attendait 0,8 s un echo qui ne vient pas
+    import time
+    amp = _FakeAmp()
+    ctl = server.DenonAVRController("127.0.0.1", amp.port)
+    t0 = time.perf_counter()
+    assert ctl.volume_set(32) == "Volume regle a 32"
+    assert time.perf_counter() - t0 < 0.5

@@ -1,6 +1,6 @@
 [project]
 name = "denon-mcp"
-version = "0.3.1"
+version = "0.3.2"
 description = "MCP server for Denon AVR home cinema control via telnet"
 readme = "README.md"
 authors = [{ name = "amineutron", email = "amine.neutroncore@gmail.com" }]

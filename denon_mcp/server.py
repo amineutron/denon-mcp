@@ -160,6 +160,27 @@ def rediscover_host(mac: str, hint_ip: str) -> str | None:
     return found
 
 
+# Attente maximale de la reponse a une commande. Mesure sur un AVR-X1700H :
+# 15 a 60 ms ; au-dela, on passe a la suite (ampli en veille qui ne repond pas
+# a tout, commande d'allumage lente).
+REPLY_TIMEOUT_S = 0.8
+# Un ordre (MV44, MVUP, MUON...) n'est pas toujours acquitte : regler le volume a sa
+# valeur actuelle ne renvoie rien. On attend au plus cet ecart (le protocole Denon
+# demande ~50 ms entre deux commandes), la relecture qui suit donne l'etat reel.
+COMMAND_GAP_S = 0.15
+
+
+def reply_prefix(command: str) -> str:
+    """Prefixe des reponses du Denon a une commande : 2 lettres (PW, MV, MU, SI...)."""
+    return command[:2]
+
+
+def is_reply(line: str, prefix: str) -> bool:
+    """La ligne repond-elle a une commande de ce prefixe ? MVMAX (plafond de volume)
+    commence par MV mais n'est pas une reponse de volume."""
+    return line.startswith(prefix) and not (prefix == "MV" and line.startswith("MVMAX"))
+
+
 _NO_HOST = "DENON_HOST not configured (env DENON_HOST, or denon.host in config.yaml)"
 
 
@@ -173,18 +194,16 @@ class DenonAVRController:
         self.timeout = 3
 
     def _send_command(self, command: str) -> str:
-        """Envoie une commande au Denon et retourne la reponse.
+        """Envoie une commande au Denon et retourne la reponse brute."""
+        return self._send_commands([command])
 
-        Args:
-            command: Commande Denon (ex: "MV44", "PWON", "MV?")
-
-        Returns:
-            Reponse brute du Denon
-        """
+    def _send_commands(self, commands: list[str]) -> str:
+        """Envoie des commandes dans UNE connexion telnet et retourne toutes les lignes
+        recues (separees par \\r). Avant : une connexion et 0,3 s d'attente par commande."""
         if not self.host:
             return f"ERROR: {_NO_HOST}"
         try:
-            return self._send_once(self.host, command)
+            return self._send_once(self.host, commands)
         except OSError as first:
             # IP changee par le DHCP ? on retrouve le Denon par sa MAC et on reessaie une fois
             new_host = rediscover_host(self.mac, self.host) if self.mac else None
@@ -192,7 +211,7 @@ class DenonAVRController:
                 print(f"Denon: {self.host} injoignable, nouvelle IP {new_host} (MAC {self.mac})", file=sys.stderr)
                 self.host = new_host
                 try:
-                    return self._send_once(self.host, command)
+                    return self._send_once(self.host, commands)
                 except OSError as second:
                     return self._error(second)
             return self._error(first)
@@ -205,102 +224,91 @@ class DenonAVRController:
             return "ERROR: Timeout - Denon may be off"
         return f"ERROR: {exc}"
 
-    def _send_once(self, host: str, command: str) -> str:
-        """Une connexion telnet, une commande, la reponse brute (leve OSError)."""
+    def _send_once(self, host: str, commands: list[str]) -> str:
+        """Une connexion telnet : chaque commande est envoyee puis sa reponse attendue
+        (ligne au bon prefixe, au plus REPLY_TIMEOUT_S) avant la suivante. Les lignes sont
+        rendues dans l'ordre d'arrivee ; le Denon en envoie parfois en retard (MVMAX),
+        d'ou l'attribution par prefixe dans les lecteurs. Leve OSError."""
+        lines: list[str] = []
+        pending = ""
         with socket.create_connection((host, self.port), timeout=self.timeout) as sock:
-            sock.send(f"{command}\r".encode('ascii'))
-            time.sleep(0.3)
-            return sock.recv(1024).decode('ascii', errors='ignore').strip()
+            for command in commands:
+                prefix = reply_prefix(command)
+                sock.send(f"{command}\r".encode('ascii'))
+                wait = REPLY_TIMEOUT_S if command.endswith("?") else COMMAND_GAP_S
+                deadline = time.monotonic() + wait
+                answered = False
+                while not answered:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    sock.settimeout(remaining)
+                    try:
+                        chunk = sock.recv(1024)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    pending += chunk.decode('ascii', errors='ignore')
+                    *complete, pending = pending.split('\r')
+                    for line in (x.strip() for x in complete):
+                        if line:
+                            lines.append(line)
+                            answered = answered or is_reply(line, prefix)
+        if pending.strip():
+            lines.append(pending.strip())
+        return "\r".join(lines)
+
+    @staticmethod
+    def _parse_volume(response: str) -> dict:
+        """Derniere valeur de volume de la reponse : MV245 -> 24.5, MV44 -> 44 (MVMAX ignore)."""
+        if "ERROR" in response:
+            return {"error": response}
+        values = [line[2:] for line in response.split('\r') if is_reply(line, "MV")]
+        if not values:
+            return {"error": "Could not parse volume"}
+        vol_str = values[-1]
+        if len(vol_str) == 3 and vol_str.isdigit():
+            volume = float(vol_str) / 10
+        elif vol_str.isdigit():
+            volume = int(vol_str)
+        else:
+            volume = -1
+        return {"current": volume, "min": 0, "max": 98}
 
     def get_volume(self) -> dict:
         """Retourne le volume actuel."""
-        response = self._send_command("MV?")
-
-        if "ERROR" in response:
-            return {"error": response}
-
-        # Parser MV245 -> 24.5, MV44 -> 44
-        for line in response.split('\r'):
-            if line.startswith('MV') and not line.startswith('MVMAX'):
-                vol_str = line[2:]  # Enlever "MV"
-                if len(vol_str) == 3:  # Ex: "245" -> 24.5
-                    volume = float(vol_str) / 10
-                elif len(vol_str) == 2:  # Ex: "44" -> 44
-                    volume = int(vol_str)
-                else:
-                    volume = int(vol_str) if vol_str.isdigit() else -1
-
-                return {"current": volume, "min": 0, "max": 98}
-
-        return {"error": "Could not parse volume"}
+        return self._parse_volume(self._send_command("MV?"))
 
     def volume_set(self, level: int) -> str:
-        """Regle le volume a un niveau specifique (0-98).
-
-        Args:
-            level: Niveau de volume (0-98, ou 80 = 0dB reference)
-
-        Returns:
-            Message de confirmation
-        """
+        """Regle le volume (0-98, 80 = 0 dB) et le relit dans la meme session."""
         level = max(0, min(98, level))
-
-        # Format Denon: MV44 pour 44, MV445 pour 44.5
-        # On utilise des entiers seulement
-        response = self._send_command(f"MV{level:02d}")
-
+        # Format Denon : MV44 pour 44 (entiers seulement)
+        response = self._send_commands([f"MV{level:02d}", "MV?"])
         if "ERROR" in response:
             return f"Erreur: {response}"
-
-        # Verifier que ca a marche
-        time.sleep(0.2)
-        check = self.get_volume()
+        check = self._parse_volume(response)
         if "error" not in check:
             actual = check["current"]
             if abs(actual - level) < 0.6:  # Tolerance 0.5
                 return f"Volume regle a {level}"
-            else:
-                return f"Volume partiellement regle (demande: {level}, actuel: {actual})"
-
+            return f"Volume partiellement regle (demande: {level}, actuel: {actual})"
         return f"Volume regle a {level}"
 
+    def _volume_step(self, command: str, step: int, fallback: str) -> str:
+        response = self._send_commands([command] * max(1, step) + ["MV?"])
+        if "ERROR" in response:
+            return f"Erreur: {response}"
+        vol = self._parse_volume(response)
+        return f"Volume: {vol['current']}" if "error" not in vol else fallback
+
     def volume_up(self, step: int = 1) -> str:
-        """Augmente le volume.
-
-        Args:
-            step: Nombre de fois a augmenter (default: 1)
-
-        Returns:
-            Message avec nouveau volume
-        """
-        for _ in range(step):
-            self._send_command("MVUP")
-            time.sleep(0.1)
-
-        time.sleep(0.2)
-        vol = self.get_volume()
-        if "error" not in vol:
-            return f"Volume: {vol['current']}"
-        return "Volume augmente"
+        """Augmente le volume de `step` pas (une session, relecture a la fin)."""
+        return self._volume_step("MVUP", step, "Volume augmente")
 
     def volume_down(self, step: int = 1) -> str:
-        """Baisse le volume.
-
-        Args:
-            step: Nombre de fois a baisser (default: 1)
-
-        Returns:
-            Message avec nouveau volume
-        """
-        for _ in range(step):
-            self._send_command("MVDOWN")
-            time.sleep(0.1)
-
-        time.sleep(0.2)
-        vol = self.get_volume()
-        if "error" not in vol:
-            return f"Volume: {vol['current']}"
-        return "Volume baisse"
+        """Baisse le volume de `step` pas (une session, relecture a la fin)."""
+        return self._volume_step("MVDOWN", step, "Volume baisse")
 
     def mute_on(self) -> str:
         """Active le mute."""
@@ -347,28 +355,22 @@ class DenonAVRController:
         return f"Erreur: {response}"
 
     def get_status(self) -> dict:
-        """Retourne le statut complet du Denon."""
-        power = self._send_command("PW?")
-        if "ERROR" in power:
+        """Statut complet (alimentation, volume, sourdine, source) en une seule session."""
+        response = self._send_commands(["PW?", "MV?", "MU?", "SI?"])
+        lines = [line.strip() for line in response.split('\r')]
+        if "ERROR" in response or not any(is_reply(line, "PW") for line in lines):
             # Injoignable (eteint au secteur, reseau) : distinct de la veille,
             # qui repond PWSTANDBY.
             return {"volume": None, "power": "unknown", "muted": False,
-                    "source": None, "reachable": False, "error": power}
-        vol = self.get_volume()
-        mute = self._send_command("MU?")
-        source = self._send_command("SI?")
-
-        lignes_mute = [ligne.strip() for ligne in mute.split('\r')]
-        lignes_src = [ligne.strip() for ligne in source.split('\r') if ligne.strip().startswith("SI")]
-        status = {
-            "volume": vol.get("current", -1),
-            "power": "on" if "PWON" in power else "standby",
-            "muted": "MUON" in lignes_mute,
-            "source": lignes_src[0][2:] if lignes_src else None,
+                    "source": None, "reachable": False, "error": response or "ERROR: no reply"}
+        sources = [line for line in lines if is_reply(line, "SI")]
+        return {
+            "volume": self._parse_volume(response).get("current", -1),
+            "power": "on" if "PWON" in lines else "standby",
+            "muted": "MUON" in lines,
+            "source": sources[0][2:] if sources else None,
             "reachable": True,
         }
-
-        return status
 
     def set_input(self, source: str) -> str:
         """Change la source d'entree.

@@ -2,6 +2,12 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions [SemVer](https://semver.org/lang/fr/).
 
+## [0.3.2] - 2026-09-26
+
+### Modifié
+
+- One telnet session per call instead of one connection per command with a fixed 0.3 s wait: each reply is read as soon as it arrives (queries wait up to 0.8 s, orders at most 0.15 s, the protocol's recommended gap) and matched by prefix, since the receiver sends some lines late (MVMAX). Measured on an AVR-X1700H: get_status 1206 ms -> ~220 ms, one volume step ~130 ms, volume_set ~170 ms.
+
 ## [0.3.1] - 2026-09-25
 
 ### Corrigé

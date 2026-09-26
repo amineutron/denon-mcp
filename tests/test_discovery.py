@@ -42,7 +42,7 @@ def test_send_command_rebascule_sur_la_nouvelle_ip(monkeypatch):
     ctl = server.DenonAVRController("192.0.2.22", 23, mac="000678123456")
     calls = []
 
-    def fake_once(host, command):
+    def fake_once(host, commands):
         calls.append(host)
         if host == "192.0.2.22":
             raise ConnectionRefusedError(111, "Connection refused")
